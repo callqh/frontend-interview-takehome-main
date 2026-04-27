@@ -9,12 +9,20 @@ interface MessagesPageProps {
   initialTicketId: string | null
 }
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error('Failed to load messages')
+  }
+
+  return response.json()
+}
 
 const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const router = useRouter()
   const { setUnreadCount } = useMessagesContext()
-  const { data: tickets, mutate } = useSWR<Ticket[]>('/api/tickets', fetcher)
+  const { data: tickets, error, isLoading, mutate } = useSWR<Ticket[]>('/api/tickets', fetcher)
 
   // Sync unread count into context
   useEffect(() => {
@@ -66,7 +74,25 @@ const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
           Messages
         </div>
 
-        {tickets?.map(ticket => {
+        {isLoading && (
+          <div style={{ padding: '20px', color: '#888', fontSize: 13 }}>
+            Loading messages...
+          </div>
+        )}
+
+        {error && (
+          <div style={{ padding: '20px', color: '#c62828', fontSize: 13 }}>
+            Failed to load messages.
+          </div>
+        )}
+
+        {!isLoading && !error && tickets?.length === 0 && (
+          <div style={{ padding: '20px', color: '#888', fontSize: 13 }}>
+            No messages yet.
+          </div>
+        )}
+
+        {!isLoading && !error && tickets?.map(ticket => {
           const isActive = ticket.id === currentTicketId
           return (
             <div
