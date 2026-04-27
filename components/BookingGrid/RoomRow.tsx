@@ -40,6 +40,13 @@ interface PositionedBooking extends VisibleBooking {
   hasOverlap: boolean;
 }
 
+interface ClippedBookingPosition {
+  left: number;
+  width: number;
+  startsBeforeRange: boolean;
+  endsAfterRange: boolean;
+}
+
 function getBookingStatus(status: BookingStatus): string {
   return STATUS_COLORS[status] ?? "#ccc";
 }
@@ -73,6 +80,22 @@ function assignBookingLanes(bookings: VisibleBooking[]): PositionedBooking[] {
       }),
     };
   });
+}
+
+function getClippedBookingPosition(
+  startDay: number,
+  endDay: number,
+  totalDays: number,
+): ClippedBookingPosition {
+  const visibleStartDay = Math.max(startDay, 0);
+  const visibleEndDay = Math.min(endDay, totalDays - 1);
+
+  return {
+    left: visibleStartDay * COLUMN_WIDTH_PX,
+    width: (visibleEndDay - visibleStartDay + 1) * COLUMN_WIDTH_PX,
+    startsBeforeRange: startDay < 0,
+    endsAfterRange: endDay >= totalDays,
+  };
 }
 
 function RoomRowComponent({
@@ -180,12 +203,12 @@ function RoomRowComponent({
 
         {/* Booking bars */}
         {visibleBookings.map(({ booking, startDay, endDay, color, lane, hasOverlap }) => {
-          const left = startDay * COLUMN_WIDTH_PX;
-          const width = (endDay - startDay + 1) * COLUMN_WIDTH_PX;
+          const { left, width, startsBeforeRange, endsAfterRange } =
+            getClippedBookingPosition(startDay, endDay, totalDays);
           return (
             <div
               key={booking.id}
-              title={`${booking.guestName} (${booking.status})${hasOverlap ? " - overlapping booking" : ""}`}
+              title={`${booking.guestName} (${booking.status})${hasOverlap ? " - overlapping booking" : ""}${startsBeforeRange ? " - starts before visible range" : ""}${endsAfterRange ? " - ends after visible range" : ""}`}
               onClick={() => onBookingClick(booking)}
               style={{
                 position: "absolute",
@@ -194,7 +217,7 @@ function RoomRowComponent({
                 height: BOOKING_BAR_HEIGHT,
                 top: BOOKING_BAR_TOP + lane * (BOOKING_BAR_HEIGHT + BOOKING_BAR_GAP),
                 background: color,
-                borderRadius: 4,
+                borderRadius: `${startsBeforeRange ? 0 : 4}px ${endsAfterRange ? 0 : 4}px ${endsAfterRange ? 0 : 4}px ${startsBeforeRange ? 0 : 4}px`,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
