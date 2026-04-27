@@ -10,6 +10,7 @@
 6. 每行重复 filter bookings，并重复计算日期偏移，数据量变大时会放大渲染成本。
 7. 横向滚动原本通过 React state 驱动 `visibleRange`，滚动时会触发大量行重算。
 8. booking 定位、重叠判断、lane 分配和裁剪逻辑都放在 `RoomRow.tsx` 中，组件同时承担算法和渲染职责，后续测试和维护不方便。
+9. 没有预订的房间行使用 `bookingsByRoomId.get(room.id) ?? []` 作为 fallback，每次 `BookingGrid` 重渲染都会创建新的空数组引用，导致 `React.memo(RoomRow)` 浅比较失效；打开预订详情时即使点击的不是 room-28/29/30，这些空房间行也会重新 render。
 
 ### Messages 页面
 
@@ -42,7 +43,8 @@
 9. 删除横向滚动 state 和 `useVisibleRange`，横向滚动交给浏览器原生处理。当前只有 30 天，虚拟化收益低，React state 驱动滚动反而会带来大量重算。Commit: [75f86bb](https://github.com/callqh/frontend-interview-takehome-main/commit/75f86bb)。
 10. 抽离一些公共方法和常量到单独文件中方便后续维护。Commit: [ee71b5a](https://github.com/callqh/frontend-interview-takehome-main/commit/ee71b5a)。
 11. 为 Bookings 页面和 BookingDrawer 增加请求失败状态。Commit: [ee71b5a](https://github.com/callqh/frontend-interview-takehome-main/commit/ee71b5a)。
-12. 将 booking 定位、重叠 lane 分配和可视范围裁剪抽到 `bookingLayout.ts`，`RoomRow` 只保留渲染和 hover 状态。这样可以让布局算法独立测试，也避免继续扩大组件职责。Commit: 待提交。
+12. 将 booking 定位、重叠 lane 分配和可视范围裁剪抽到 `bookingLayout.ts`，`RoomRow` 只保留渲染和 hover 状态。这样可以让布局算法独立测试，也避免继续扩大组件职责。Commit: [3f7498e](https://github.com/callqh/frontend-interview-takehome-main/commit/3f7498e)。
+13. 将无预订房间的 fallback 从 inline `[]` 改为模块级稳定常量 `EMPTY_BOOKINGS`。这样父组件打开 drawer 重渲染时，空房间行收到的 `bookings` prop 引用保持不变，`React.memo` 可以正确跳过无关行渲染。Commit: [f9032cd](https://github.com/callqh/frontend-interview-takehome-main/commit/f9032cd)。
 
 ### Messages 页面
 
