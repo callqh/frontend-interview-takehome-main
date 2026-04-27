@@ -6,7 +6,8 @@
 4. Messages 页面把 URL 中的 `ticketId/houseId` 再同步到全局 Context，形成重复状态源；点击工单会更新全局 Provider，使只关心未读数的 Sidebar 也跟着刷新。
 5. `pages/api` 使用 `setTimeout` 后立即返回 handler，Next.js 会警告 API 在发送响应前已 resolved，虽然最后能返回数据，但这不是正确的异步边界。
 6. 同一房间、同一状态的重叠预订会画在同一层，颜色一致时看起来像一条预订被错误延长。
-7. 项目缺少 ESLint 配置，`npm run lint` 会进入交互式初始化，不适合作为可重复的交付验证命令。
+7. Booking 网格横向滚动时房间名列会滚走；初步 sticky 后又因表头和行内容不在同一个横向滚动坐标系，导致日期轴与行内容短暂错位。
+8. 项目缺少 ESLint 配置，`npm run lint` 会进入交互式初始化，不适合作为可重复的交付验证命令。
 
 ## 应用的修复
 
@@ -16,12 +17,13 @@
 4. Messages 选中工单以 URL query 作为唯一状态源；MessagesContext 只保留 Sidebar 需要的 unread count，减少跨页面耦合。
 5. 将 mock API handler 改为 `async/await delay`，保留模拟网络延迟，同时让 Next.js 正确等待响应完成。
 6. 在 `RoomRow` 中为重叠预订分配 lane，按垂直分层展示，并为冲突条增加轻量描边提示；保留 `checkOut` 作为占用日的现有语义。
-7. 添加最小 `.eslintrc.json`，让 `npm run lint -- --max-warnings=0` 可以非交互式运行。
+7. 将日期表头放入同一个横向滚动容器并用 sticky 固定顶部；房间名列按整行高度 sticky，避免滚动时遮盖不完整和列错位。
+8. 添加最小 `.eslintrc.json`，让 `npm run lint -- --max-warnings=0` 可以非交互式运行。
 
 ## 权衡取舍
 
 - 没有引入虚拟列表、状态库或数据请求库，符合题目“不安装额外主要依赖、继续使用 SWR”的限制。
-- 保留 `RoomRow` 的 render 日志，因为它是观察重渲染问题和验证修复效果的有用线索。
+- 保留 `reactStrictMode` 和 `RoomRow` 的 render 日志；开发环境会出现成对 render log，这是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
 - 没有重做视觉样式或 API mock；本次聚焦性能边界、状态来源和工程化可验证性。
 
 ## 如果有更多时间
@@ -29,3 +31,4 @@
 - 用 React Profiler 量化 hover/scroll 前后的提交次数和耗时。
 - 为 Booking 网格补充真正的横向/纵向窗口化和固定房间列。
 - 增加页面级交互测试，覆盖 drawer 打开、消息 URL 刷新恢复和 lint/build CI。
+- 如果数据规模扩大到数百/数千房间，需要引入纵向虚拟滚动，并把 bookings 按日期范围/房间范围分页加载；当前实现仍会一次渲染所有房间行，横向滚动也会触发所有行重算。
