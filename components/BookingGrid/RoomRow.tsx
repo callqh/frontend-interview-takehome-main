@@ -1,8 +1,8 @@
-import React, { useMemo } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { Booking, BookingStatus } from "@/types";
-import { useAppContext } from "@/context/AppContext";
 
 const COLUMN_WIDTH_PX = 48;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface RoomRowProps {
   rowId: string;
@@ -10,8 +10,8 @@ interface RoomRowProps {
   bookings: Booking[];
   visibleStartIndex: number;
   visibleEndIndex: number;
-  totalDays: number;
   onBookingClick: (booking: Booking) => void;
+  dateRangeStart: string;
 }
 
 const STATUS_COLORS: Record<BookingStatus, string> = {
@@ -22,56 +22,43 @@ const STATUS_COLORS: Record<BookingStatus, string> = {
   cancelled: "#F44336",
 };
 
-export function RoomRow({
+function getBookingStatus(status: BookingStatus): string {
+  return STATUS_COLORS[status] ?? "#ccc";
+}
+
+function getDayOffset(date: string, rangeStartTime: number): number {
+  return Math.floor((new Date(date).getTime() - rangeStartTime) / MS_PER_DAY);
+}
+
+function RoomRowComponent({
   rowId,
   rowName,
   bookings,
   visibleStartIndex,
   visibleEndIndex,
-  totalDays,
   onBookingClick,
+  dateRangeStart,
 }: RoomRowProps) {
   console.log("render", rowId);
 
-  const { hoveredCell, setHoveredCell, config } = useAppContext();
-
-  // fix: ReferenceError: Cannot access 'getBookingStatus' before initialization
-  const getBookingStatus = (status: BookingStatus): string => {
-    return STATUS_COLORS[status] ?? "#ccc";
-  };
+  const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
 
   const visibleBookings = useMemo(() => {
+    const rangeStartTime = new Date(dateRangeStart).getTime();
+
     return bookings
-      .filter((b) => {
-        const startDay = Math.floor(
-          (new Date(b.checkIn).getTime() -
-            new Date(config.dateRangeStart).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        const endDay = Math.floor(
-          (new Date(b.checkOut).getTime() -
-            new Date(config.dateRangeStart).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        return endDay >= visibleStartIndex && startDay <= visibleEndIndex;
-      })
       .map((b) => {
-        const startDay = Math.floor(
-          (new Date(b.checkIn).getTime() -
-            new Date(config.dateRangeStart).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        const endDay = Math.floor(
-          (new Date(b.checkOut).getTime() -
-            new Date(config.dateRangeStart).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
+        const startDay = getDayOffset(b.checkIn, rangeStartTime);
+        const endDay = getDayOffset(b.checkOut, rangeStartTime);
         const color = getBookingStatus(b.status);
         return { booking: b, startDay, endDay, color };
+      })
+      .filter(({ startDay, endDay }) => {
+        return endDay >= visibleStartIndex && startDay <= visibleEndIndex;
       });
-  }, [bookings, visibleStartIndex, visibleEndIndex, config.dateRangeStart]);
+  }, [bookings, visibleStartIndex, visibleEndIndex, dateRangeStart]);
 
-  const isHovered = hoveredCell?.rowId === rowId;
+  const isHovered = hoveredDayIndex !== null;
 
   return (
     <div
@@ -103,9 +90,7 @@ export function RoomRow({
           { length: visibleEndIndex - visibleStartIndex + 1 },
           (_, i) => {
             const dayIndex = visibleStartIndex + i;
-            const isCellHovered =
-              hoveredCell?.rowId === rowId &&
-              hoveredCell?.dayIndex === dayIndex;
+            const isCellHovered = hoveredDayIndex === dayIndex;
             return (
               <div
                 key={dayIndex}
@@ -118,8 +103,8 @@ export function RoomRow({
                   borderRight: "1px solid #f0f0f0",
                   cursor: "default",
                 }}
-                onMouseEnter={() => setHoveredCell({ rowId, dayIndex })}
-                onMouseLeave={() => setHoveredCell(null)}
+                onMouseEnter={() => setHoveredDayIndex(dayIndex)}
+                onMouseLeave={() => setHoveredDayIndex(null)}
               />
             );
           },
@@ -168,3 +153,5 @@ export function RoomRow({
     </div>
   );
 }
+
+export const RoomRow = memo(RoomRowComponent);

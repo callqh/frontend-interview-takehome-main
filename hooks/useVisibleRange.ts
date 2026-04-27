@@ -6,21 +6,20 @@ const VISIBLE_COLUMNS = 14
 interface VisibleRange {
   startIndex: number
   endIndex: number
-  offsetPx: number
 }
 
 export function useVisibleRange() {
-  const [scrollLeft, setScrollLeft] = useState(0)
+  const [startIndex, setStartIndex] = useState(0)
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollLeft(e.currentTarget.scrollLeft)
+    const nextStartIndex = Math.floor(e.currentTarget.scrollLeft / COLUMN_WIDTH_PX)
+    setStartIndex(current => current === nextStartIndex ? current : nextStartIndex)
   }, [])
 
   const visibleRange: VisibleRange = {
-    startIndex: Math.floor(scrollLeft / COLUMN_WIDTH_PX),
-    endIndex: Math.floor(scrollLeft / COLUMN_WIDTH_PX) + VISIBLE_COLUMNS,
-    offsetPx: scrollLeft % COLUMN_WIDTH_PX,
+    startIndex,
+    endIndex: startIndex + VISIBLE_COLUMNS,
   }
 
-  return { visibleRange, handleScroll, scrollLeft }
+  return { visibleRange, handleScroll }
 }

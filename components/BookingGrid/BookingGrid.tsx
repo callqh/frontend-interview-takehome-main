@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Booking, RoomUnit } from '@/types'
 import { useVisibleRange } from '@/hooks/useVisibleRange'
 import { RoomRow } from './RoomRow'
-import {useAppContext} from "@/context/AppContext";
+import { useAppContext } from '@/context/AppContext'
 
 const COLUMN_WIDTH_PX = 48
 const TOTAL_DAYS = 30
@@ -25,8 +25,19 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
   const { visibleRange, handleScroll } = useVisibleRange()
   const { config } = useAppContext()
 
-  const startDate = new Date().toISOString().split('T')[0]
-  const dayLabels = getDayLabels(startDate, TOTAL_DAYS)
+  const dayLabels = useMemo(
+    () => getDayLabels(config.dateRangeStart, TOTAL_DAYS),
+    [config.dateRangeStart]
+  )
+  const bookingsByRoomId = useMemo(() => {
+    const grouped = new Map<string, Booking[]>()
+    bookings.forEach(booking => {
+      const roomBookings = grouped.get(booking.roomUnit.roomId) ?? []
+      roomBookings.push(booking)
+      grouped.set(booking.roomUnit.roomId, roomBookings)
+    })
+    return grouped
+  }, [bookings])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -73,9 +84,7 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
       >
         <div style={{ minWidth: TOTAL_DAYS * COLUMN_WIDTH_PX + 140 }}>
           {roomUnits.map(room => {
-            const roomBookings = bookings.filter(
-              b => b.roomUnit.roomId === room.id
-            )
+            const roomBookings = bookingsByRoomId.get(room.id) ?? []
             return (
               <RoomRow
                 key={room.id}
@@ -84,8 +93,8 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
                 bookings={roomBookings}
                 visibleStartIndex={visibleRange.startIndex}
                 visibleEndIndex={visibleRange.endIndex}
-                totalDays={TOTAL_DAYS}
                 onBookingClick={onBookingClick}
+                dateRangeStart={config.dateRangeStart}
               />
             )
           })}
