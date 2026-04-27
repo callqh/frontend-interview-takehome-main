@@ -62,8 +62,8 @@
 
 ## 权衡取舍
 
-- 没有引入 Redux、Zustand、React Query 等新依赖；继续使用 SWR，因为题目明确要求保留 SWR，当前问题也能通过缩小状态范围和复用 SWR 缓存解决。
 - 没有做横向虚拟滚动；当前固定 30 天，全量渲染列的复杂度更低，也更不容易破坏表头/行对齐。若时间维度显著拉长，再考虑横向虚拟化。
+- 大量重叠预订目前只做 lane 分层，未做折叠/冲突工作流
 - 已读状态只做 SWR 本地乐观更新；当前 mock API 没有“标记已读”接口，所以刷新后仍会回到初始未读数。真实系统应调用 API 持久化，并通过轮询、SSE/WebSocket 或服务端推送同步未读数。
 - 保留 `reactStrictMode` 和 `RoomRow` render 日志；开发环境成对 render log 是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
 - `MessagesContext` 中旧的 `HOUSES/House` 映射未直接删除，而是按要求注释保留；当前页面直接从 ticket 读取 `houseName`。
@@ -78,3 +78,4 @@
 - 工程：为日期裁剪、lane 分配、SWR mutate 已读状态增加测试；统一日期解析，避免 `YYYY-MM-DD` 在时区解析上的潜在 off-by-one。
 - 样式：将高频渲染区域的 inline style 迁移到 CSS Module 或提取稳定 style 常量，补齐 hover/focus、响应式和可访问性样式。
 - 响应式：当前 Sidebar + booking grid / message list + detail pane 在窄屏会拥挤，需要单独适配。
+- 用户视角交互问题清单已整理到 `docs/ux-interaction-review.md`，作为后续 UX、可访问性和产品化优化索引。
