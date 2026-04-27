@@ -2,7 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { BOOKING_DETAILS } from '@/lib/mockData'
 import { BookingDetail } from '@/types'
 
-export default function handler(
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<BookingDetail | { error: string }>
 ) {
@@ -14,7 +16,6 @@ export default function handler(
   }
 
   // Simulate network delay
-  setTimeout(() => {
-    res.status(200).json(detail)
-  }, 300)
+  await delay(300)
+  res.status(200).json(detail)
 }
