@@ -13,8 +13,6 @@ interface RoomRowProps {
   rowId: string;
   rowName: string;
   bookings: Booking[];
-  visibleStartIndex: number;
-  visibleEndIndex: number;
   onBookingClick: (booking: Booking) => void;
   dateRangeStart: string;
   totalDays: number;
@@ -82,6 +80,27 @@ function assignBookingLanes(bookings: VisibleBooking[]): PositionedBooking[] {
   });
 }
 
+function getPositionedBookings(
+  bookings: Booking[],
+  dateRangeStart: string,
+  totalDays: number,
+): PositionedBooking[] {
+  const rangeStartTime = new Date(dateRangeStart).getTime();
+
+  const bookingsInRange = bookings
+    .map((booking) => {
+      const startDay = getDayOffset(booking.checkIn, rangeStartTime);
+      const endDay = getDayOffset(booking.checkOut, rangeStartTime);
+      const color = getBookingStatus(booking.status);
+      return { booking, startDay, endDay, color };
+    })
+    .filter(({ startDay, endDay }) => {
+      return endDay >= 0 && startDay < totalDays;
+    });
+
+  return assignBookingLanes(bookingsInRange);
+}
+
 function getClippedBookingPosition(
   startDay: number,
   endDay: number,
@@ -102,8 +121,6 @@ function RoomRowComponent({
   rowId,
   rowName,
   bookings,
-  visibleStartIndex,
-  visibleEndIndex,
   onBookingClick,
   dateRangeStart,
   totalDays,
@@ -112,26 +129,13 @@ function RoomRowComponent({
 
   const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
 
-  const visibleBookings = useMemo(() => {
-    const rangeStartTime = new Date(dateRangeStart).getTime();
-
-    const visibleItems = bookings
-      .map((b) => {
-        const startDay = getDayOffset(b.checkIn, rangeStartTime);
-        const endDay = getDayOffset(b.checkOut, rangeStartTime);
-        const color = getBookingStatus(b.status);
-        return { booking: b, startDay, endDay, color };
-      })
-      .filter(({ startDay, endDay }) => {
-        return endDay >= visibleStartIndex && startDay <= visibleEndIndex;
-      });
-
-    return assignBookingLanes(visibleItems);
-  }, [bookings, visibleStartIndex, visibleEndIndex, dateRangeStart]);
+  const positionedBookings = useMemo(() => {
+    return getPositionedBookings(bookings, dateRangeStart, totalDays);
+  }, [bookings, dateRangeStart, totalDays]);
 
   const isHovered = hoveredDayIndex !== null;
   const laneCount =
-    visibleBookings.reduce((maxLane, { lane }) => Math.max(maxLane, lane), 0) +
+    positionedBookings.reduce((maxLane, { lane }) => Math.max(maxLane, lane), 0) +
     1;
   const rowHeight = Math.max(
     BASE_ROW_HEIGHT,
@@ -202,7 +206,7 @@ function RoomRowComponent({
         )}
 
         {/* Booking bars */}
-        {visibleBookings.map(({ booking, startDay, endDay, color, lane, hasOverlap }) => {
+        {positionedBookings.map(({ booking, startDay, endDay, color, lane, hasOverlap }) => {
           const { left, width, startsBeforeRange, endsAfterRange } =
             getClippedBookingPosition(startDay, endDay, totalDays);
           return (

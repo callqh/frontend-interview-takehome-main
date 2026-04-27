@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react'
 import { Booking, RoomUnit } from '@/types'
-import { useVisibleRange } from '@/hooks/useVisibleRange'
 import { RoomRow } from './RoomRow'
 import { useAppContext } from '@/context/AppContext'
 
@@ -23,7 +22,6 @@ function getDayLabels(startDate: string, totalDays: number): string[] {
 }
 
 export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGridProps) {
-  const { visibleRange, handleScroll } = useVisibleRange()
   const { config } = useAppContext()
 
   const dayLabels = useMemo(
@@ -45,7 +43,6 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
       {/* Scrollable grid body */}
       <div
         style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}
-        onScroll={handleScroll}
       >
         <div style={{ minWidth: TOTAL_DAYS * COLUMN_WIDTH_PX + ROOM_COLUMN_WIDTH_PX }}>
           {/* Header row lives in the same scroll container as the rows to keep columns aligned. */}
@@ -108,8 +105,6 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
                 rowId={room.id}
                 rowName={room.name}
                 bookings={roomBookings}
-                visibleStartIndex={visibleRange.startIndex}
-                visibleEndIndex={visibleRange.endIndex}
                 onBookingClick={onBookingClick}
                 dateRangeStart={config.dateRangeStart}
                 totalDays={TOTAL_DAYS}
