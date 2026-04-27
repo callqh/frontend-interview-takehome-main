@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { Booking, RoomUnit } from '@/types'
 import { RoomRow } from './RoomRow'
 import { useAppContext } from '@/context/AppContext'
-import { COLUMN_WIDTH_PX, ROOM_COLUMN_WIDTH_PX, TOTAL_DAYS } from './constants'
+import { COLUMN_WIDTH_PX, EMPTY_BOOKINGS, ROOM_COLUMN_WIDTH_PX, TOTAL_DAYS } from './constants'
 
 interface BookingGridProps {
   roomUnits: RoomUnit[]
@@ -95,7 +95,7 @@ export function BookingGrid({ roomUnits, bookings, onBookingClick }: BookingGrid
             </div>
           </div>
           {roomUnits.map(room => {
-            const roomBookings = bookingsByRoomId.get(room.id) ?? []
+            const roomBookings = bookingsByRoomId.get(room.id) ?? EMPTY_BOOKINGS
             return (
               <RoomRow
                 key={room.id}
