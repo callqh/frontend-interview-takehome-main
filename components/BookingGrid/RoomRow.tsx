@@ -3,6 +3,10 @@ import { Booking, BookingStatus } from "@/types";
 
 const COLUMN_WIDTH_PX = 48;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const BASE_ROW_HEIGHT = 40;
+const BOOKING_BAR_HEIGHT = 24;
+const BOOKING_BAR_GAP = 4;
+const BOOKING_BAR_TOP = 6;
 
 interface RoomRowProps {
   rowId: string;
@@ -22,12 +26,51 @@ const STATUS_COLORS: Record<BookingStatus, string> = {
   cancelled: "#F44336",
 };
 
+interface VisibleBooking {
+  booking: Booking;
+  startDay: number;
+  endDay: number;
+  color: string;
+}
+
+interface PositionedBooking extends VisibleBooking {
+  lane: number;
+  hasOverlap: boolean;
+}
+
 function getBookingStatus(status: BookingStatus): string {
   return STATUS_COLORS[status] ?? "#ccc";
 }
 
 function getDayOffset(date: string, rangeStartTime: number): number {
   return Math.floor((new Date(date).getTime() - rangeStartTime) / MS_PER_DAY);
+}
+
+function bookingsOverlap(a: VisibleBooking, b: VisibleBooking): boolean {
+  return a.startDay <= b.endDay && b.startDay <= a.endDay;
+}
+
+function assignBookingLanes(bookings: VisibleBooking[]): PositionedBooking[] {
+  const sortedBookings = [...bookings].sort(
+    (a, b) => a.startDay - b.startDay || a.endDay - b.endDay,
+  );
+  const laneEndDays: number[] = [];
+
+  return sortedBookings.map((booking, index) => {
+    const laneIndex = laneEndDays.findIndex(
+      (laneEndDay) => booking.startDay > laneEndDay,
+    );
+    const lane = laneIndex === -1 ? laneEndDays.length : laneIndex;
+    laneEndDays[lane] = booking.endDay;
+
+    return {
+      ...booking,
+      lane,
+      hasOverlap: sortedBookings.some((otherBooking, otherIndex) => {
+        return index !== otherIndex && bookingsOverlap(booking, otherBooking);
+      }),
+    };
+  });
 }
 
 function RoomRowComponent({
@@ -46,7 +89,7 @@ function RoomRowComponent({
   const visibleBookings = useMemo(() => {
     const rangeStartTime = new Date(dateRangeStart).getTime();
 
-    return bookings
+    const visibleItems = bookings
       .map((b) => {
         const startDay = getDayOffset(b.checkIn, rangeStartTime);
         const endDay = getDayOffset(b.checkOut, rangeStartTime);
@@ -56,15 +99,25 @@ function RoomRowComponent({
       .filter(({ startDay, endDay }) => {
         return endDay >= visibleStartIndex && startDay <= visibleEndIndex;
       });
+
+    return assignBookingLanes(visibleItems);
   }, [bookings, visibleStartIndex, visibleEndIndex, dateRangeStart]);
 
   const isHovered = hoveredDayIndex !== null;
+  const laneCount =
+    visibleBookings.reduce((maxLane, { lane }) => Math.max(maxLane, lane), 0) +
+    1;
+  const rowHeight = Math.max(
+    BASE_ROW_HEIGHT,
+    BOOKING_BAR_TOP + laneCount * (BOOKING_BAR_HEIGHT + BOOKING_BAR_GAP) + 6,
+  );
 
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
+        minHeight: rowHeight,
         borderBottom: "1px solid #eee",
         background: isHovered ? "#f0f7ff" : "white",
       }}
@@ -84,7 +137,7 @@ function RoomRowComponent({
         {rowName}
       </div>
 
-      <div style={{ position: "relative", height: 40, flex: 1 }}>
+      <div style={{ position: "relative", height: rowHeight, flex: 1 }}>
         {/* Day cell backgrounds */}
         {Array.from(
           { length: visibleEndIndex - visibleStartIndex + 1 },
@@ -98,7 +151,7 @@ function RoomRowComponent({
                   position: "absolute",
                   left: (dayIndex - visibleStartIndex) * COLUMN_WIDTH_PX,
                   width: COLUMN_WIDTH_PX,
-                  height: 40,
+                  height: rowHeight,
                   background: isCellHovered ? "#e3f2fd" : "transparent",
                   borderRight: "1px solid #f0f0f0",
                   cursor: "default",
@@ -111,7 +164,7 @@ function RoomRowComponent({
         )}
 
         {/* Booking bars */}
-        {visibleBookings.map(({ booking, startDay, endDay, color }) => {
+        {visibleBookings.map(({ booking, startDay, endDay, color, lane, hasOverlap }) => {
           const left = Math.max(
             0,
             (startDay - visibleStartIndex) * COLUMN_WIDTH_PX,
@@ -124,14 +177,14 @@ function RoomRowComponent({
           return (
             <div
               key={booking.id}
-              title={`${booking.guestName} (${booking.status})`}
+              title={`${booking.guestName} (${booking.status})${hasOverlap ? " - overlapping booking" : ""}`}
               onClick={() => onBookingClick(booking)}
               style={{
                 position: "absolute",
                 left,
                 width: width - 2,
-                height: 28,
-                top: 6,
+                height: BOOKING_BAR_HEIGHT,
+                top: BOOKING_BAR_TOP + lane * (BOOKING_BAR_HEIGHT + BOOKING_BAR_GAP),
                 background: color,
                 borderRadius: 4,
                 cursor: "pointer",
@@ -143,6 +196,7 @@ function RoomRowComponent({
                 overflow: "hidden",
                 whiteSpace: "nowrap",
                 zIndex: 2,
+                boxShadow: hasOverlap ? "0 0 0 2px rgba(0,0,0,0.18)" : "none",
               }}
             >
               {booking.guestName}
