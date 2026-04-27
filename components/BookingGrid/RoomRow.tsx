@@ -2,6 +2,7 @@ import React, { memo, useMemo, useState } from "react";
 import { Booking, BookingStatus } from "@/types";
 
 const COLUMN_WIDTH_PX = 48;
+const ROOM_COLUMN_WIDTH_PX = 140;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const BASE_ROW_HEIGHT = 40;
 const BOOKING_BAR_HEIGHT = 24;
@@ -16,6 +17,7 @@ interface RoomRowProps {
   visibleEndIndex: number;
   onBookingClick: (booking: Booking) => void;
   dateRangeStart: string;
+  totalDays: number;
 }
 
 const STATUS_COLORS: Record<BookingStatus, string> = {
@@ -81,6 +83,7 @@ function RoomRowComponent({
   visibleEndIndex,
   onBookingClick,
   dateRangeStart,
+  totalDays,
 }: RoomRowProps) {
   console.log("render", rowId);
 
@@ -124,32 +127,44 @@ function RoomRowComponent({
     >
       <div
         style={{
-          width: 140,
-          minWidth: 140,
+          position: "sticky",
+          left: 0,
+          width: ROOM_COLUMN_WIDTH_PX,
+          minWidth: ROOM_COLUMN_WIDTH_PX,
+          height: rowHeight,
           padding: "8px 12px",
           fontWeight: 500,
           fontSize: 13,
           borderRight: "1px solid #eee",
-          background: "white",
-          zIndex: 1,
+          background: isHovered ? "#f0f7ff" : "white",
+          zIndex: 5,
+          display: "flex",
+          alignItems: "center",
         }}
       >
         {rowName}
       </div>
 
-      <div style={{ position: "relative", height: rowHeight, flex: 1 }}>
+      <div
+        style={{
+          position: "relative",
+          height: rowHeight,
+          width: totalDays * COLUMN_WIDTH_PX,
+          minWidth: totalDays * COLUMN_WIDTH_PX,
+        }}
+      >
         {/* Day cell backgrounds */}
         {Array.from(
-          { length: visibleEndIndex - visibleStartIndex + 1 },
+          { length: totalDays },
           (_, i) => {
-            const dayIndex = visibleStartIndex + i;
+            const dayIndex = i;
             const isCellHovered = hoveredDayIndex === dayIndex;
             return (
               <div
                 key={dayIndex}
                 style={{
                   position: "absolute",
-                  left: (dayIndex - visibleStartIndex) * COLUMN_WIDTH_PX,
+                  left: dayIndex * COLUMN_WIDTH_PX,
                   width: COLUMN_WIDTH_PX,
                   height: rowHeight,
                   background: isCellHovered ? "#e3f2fd" : "transparent",
@@ -165,15 +180,8 @@ function RoomRowComponent({
 
         {/* Booking bars */}
         {visibleBookings.map(({ booking, startDay, endDay, color, lane, hasOverlap }) => {
-          const left = Math.max(
-            0,
-            (startDay - visibleStartIndex) * COLUMN_WIDTH_PX,
-          );
-          const width =
-            (Math.min(endDay, visibleEndIndex) -
-              Math.max(startDay, visibleStartIndex) +
-              1) *
-            COLUMN_WIDTH_PX;
+          const left = startDay * COLUMN_WIDTH_PX;
+          const width = (endDay - startDay + 1) * COLUMN_WIDTH_PX;
           return (
             <div
               key={booking.id}
