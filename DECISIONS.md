@@ -4,7 +4,8 @@
 2. Booking 网格把 hover 状态放在全局 `AppContext`，鼠标经过任意单元格都会更新 Provider value，导致无关组件和所有房间行重渲染。现有 `console.log('render', rowId)` 可以直接观察到这个问题。
 3. Booking 网格每次渲染都对每个房间执行 `bookings.filter`，并在每个 Row 内重复解析同一批日期；日期表头还用 `new Date()`，而 Row 使用 `config.dateRangeStart`，存在数据来源不一致。
 4. Messages 页面把 URL 中的 `ticketId/houseId` 再同步到全局 Context，形成重复状态源；点击工单会更新全局 Provider，使只关心未读数的 Sidebar 也跟着刷新。
-5. 项目缺少 ESLint 配置，`npm run lint` 会进入交互式初始化，不适合作为可重复的交付验证命令。
+5. `pages/api` 使用 `setTimeout` 后立即返回 handler，Next.js 会警告 API 在发送响应前已 resolved，虽然最后能返回数据，但这不是正确的异步边界。
+6. 项目缺少 ESLint 配置，`npm run lint` 会进入交互式初始化，不适合作为可重复的交付验证命令。
 
 ## 应用的修复
 
@@ -12,7 +13,8 @@
 2. 将 Booking hover 状态下沉到单个 `RoomRow`，并用 `React.memo` 包住 Row；AppContext 只保留稳定配置，避免 hover 扩散到整棵应用。
 3. 在 `BookingGrid` 中用 `useMemo` 按 `roomId` 预分组 bookings，Row 内只计算一次日期偏移并复用 `config.dateRangeStart` 生成表头，减少重复计算并统一日期来源。
 4. Messages 选中工单以 URL query 作为唯一状态源；MessagesContext 只保留 Sidebar 需要的 unread count，减少跨页面耦合。
-5. 添加最小 `.eslintrc.json`，让 `npm run lint -- --max-warnings=0` 可以非交互式运行。
+5. 将 mock API handler 改为 `async/await delay`，保留模拟网络延迟，同时让 Next.js 正确等待响应完成。
+6. 添加最小 `.eslintrc.json`，让 `npm run lint -- --max-warnings=0` 可以非交互式运行。
 
 ## 权衡取舍
 
