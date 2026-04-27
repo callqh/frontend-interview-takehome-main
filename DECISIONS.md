@@ -1,49 +1,78 @@
 ## 发现的问题
 
-1. 启动时会触发 `ReferenceError: Cannot access 'getBookingStatus' before initialization`，因为 `const` 函数表达式在初始化前被 `useMemo` 使用。
-2. Booking 网格把 hover 状态放在全局 `AppContext`，鼠标经过任意单元格都会更新 Provider value，导致无关组件和所有房间行重渲染。现有 `console.log('render', rowId)` 可以直接观察到这个问题。
-3. Booking 网格每次渲染都对每个房间执行 `bookings.filter`，并在每个 Row 内重复解析同一批日期；日期表头还用 `new Date()`，而 Row 使用 `config.dateRangeStart`，存在数据来源不一致。
-4. Messages 页面把 URL 中的 `ticketId/houseId` 再同步到全局 Context，形成重复状态源；点击工单会更新全局 Provider，使只关心未读数的 Sidebar 也跟着刷新。
-5. `pages/api` 使用 `setTimeout` 后立即返回 handler，Next.js 会警告 API 在发送响应前已 resolved，虽然最后能返回数据，但这不是正确的异步边界。
-6. 同一房间、同一状态的重叠预订会画在同一层，颜色一致时看起来像一条预订被错误延长。
-7. Booking 网格横向滚动时房间名列会滚走；初步 sticky 后又因表头和行内容不在同一个横向滚动坐标系，导致日期轴与行内容短暂错位。
-8. 跨出当前日期范围左侧的预订会从负坐标开始渲染，导致可见条存在但客人姓名被裁掉。
-9. 项目缺少 ESLint 配置。
-10. Booking 网格横向滚动仍通过 `useVisibleRange` 更新 React state，并把可见范围传给每个 `RoomRow`；滚动时会触发所有行重新渲染和重复 booking 布局计算。
-11. Messages 页面点击未读工单后只更新 URL 选中态，未读点和 Sidebar 未读数不会变化，和“打开即已读”的用户预期不一致。
-12. Messages 页面 tickets 请求期间左侧列表为空白，右侧直接显示“Select a message to view”，用户无法区分“正在加载”和“没有消息”。
-13. Sidebar 的 Messages 未读数依赖 Messages 页面挂载后才写入 Context，首次打开 Bookings 页面时不会展示全局未读角标。
-14. Messages 深链刷新时，右侧详情区在 tickets 加载期间会显示“Select a message to view”；如果 URL 中的 `ticketId` 无效，加载完成后也缺少明确反馈。
+### Bookings 页面
+
+1. 启动时，`RoomRow` 在 `getBookingStatus` 初始化前使用它，导致 `ReferenceError`。
+2. 同一房间的重叠预订会叠在同一层，颜色一致时看起来像一条预订被错误延长。
+3. 跨出当前可见日期范围左侧的预订从负坐标开始渲染，导致 booking bar 可见但客人姓名被裁掉。
+4. 横向滚动时房间列会滚走，或日期轴与行内容出现错位。
+5. hover 状态原本放在全局 Context，鼠标经过单元格会导致无关组件和所有房间行重渲染。
+6. 每行重复 filter bookings，并重复计算日期偏移，数据量变大时会放大渲染成本。
+7. 横向滚动原本通过 React state 驱动 `visibleRange`，滚动时会触发大量行重算。
+8. booking 定位、重叠判断、lane 分配和裁剪逻辑都放在 `RoomRow.tsx` 中，组件同时承担算法和渲染职责，后续测试和维护不方便。
+
+### Messages 页面
+
+1. 选中工单同时存在 URL 和 Context 两套状态源，容易造成状态同步和无关刷新问题。
+2. 点击未读工单后，未读点和 Sidebar 未读数不会变化，不符合“打开即已读”的用户预期。
+3. 首次进入 Bookings 页面时，Sidebar 不显示消息未读数，只有进入 Messages 后才更新。
+4. tickets 请求期间左侧列表曾出现空白，用户无法区分加载中和没有消息。
+5. 深链刷新或 URL 带无效 `ticketId` 时，右侧详情区状态不准确。
+
+### API 与工程
+
+1. mock API 使用 `setTimeout` 后 handler 立即结束，异步边界不正确。
+2. 项目缺少 ESLint 配置，`npm run lint` 会进入交互式初始化。
+3. 多处 SWR fetcher 重复定义，且非 2xx 错误处理不一致。
+4. Bookings 和 BookingDrawer 请求失败时容易被误判为空数据。
+5. 大量样式直接写在 JSX inline `style` 对象里，网格行和单元格 render 时会重复创建样式对象；这不是当前最大性能瓶颈，但会增加维护成本，也不利于复用响应式、hover/focus 和可访问性样式。
 
 ## 应用的修复
 
-1. 将 `getBookingStatus` 放到使用前定义，修复启动错误，并保留类型约束。
-2. 将 Booking hover 状态下沉到单个 `RoomRow`，并用 `React.memo` 包住 Row；AppContext 只保留稳定配置，避免 hover 扩散到整棵应用。
-3. 在 `BookingGrid` 中用 `useMemo` 按 `roomId` 预分组 bookings，Row 内只计算一次日期偏移并复用 `config.dateRangeStart` 生成表头，减少重复计算并统一日期来源。
-4. Messages 选中工单以 URL query 作为唯一状态源；MessagesContext 只保留 Sidebar 需要的 unread count，减少跨页面耦合。
-5. 将 mock API handler 改为 `async/await delay`，保留模拟网络延迟，同时让 Next.js 正确等待响应完成。
-6. 在 `RoomRow` 中为重叠预订分配 lane，按垂直分层展示，并为冲突条增加轻量描边提示；保留 `checkOut` 作为占用日的现有语义。
-7. 将日期表头放入同一个横向滚动容器并用 sticky 固定顶部；房间名列按整行高度 sticky，避免滚动时遮盖不完整和列错位。
-8. 为 booking bar 封装可视范围裁剪定位，保留原始日期用于详情和冲突判断，但将渲染 left/width 限制在当前日期网格内。
-9. 初始化 `.eslintrc.json`配置文件。
-10. 移除横向滚动 state，同步删除 `useVisibleRange`；`RoomRow` 改为一次性计算当前 30 天内的 positioned bookings，横向滚动交给浏览器原生裁剪。
-11. 点击未读工单时通过 SWR `mutate` 将当前 tickets 缓存中的该工单标记为已读，原有 unread count effect 会随缓存变化同步 Sidebar 数字。
-12. 为 Messages 列表增加 loading、error 和 empty 状态，并让 fetcher 对非 2xx 响应抛错，避免加载阶段白屏。
-13. 将 `/api/tickets` 的 SWR 请求上移到 `MessagesProvider`，Sidebar 未读数从全局 tickets 缓存派生；Messages 页面删除写 Context 的 effect，并用 shallow routing 切换选中工单。
-14. 将 Messages 右侧详情区状态拆分为选中消息加载中、请求失败、无效 ticketId 和未选择消息，避免深链刷新时展示误导性空态。
+### Bookings 页面
+
+1. 将 `getBookingStatus` 移到使用前定义，避免 `const` 函数表达式在初始化前被调用，最小改动即可恢复页面可运行。Commit: [da91351](https://github.com/callqh/frontend-interview-takehome-main/commit/da91351)。
+2. 将 hover 状态从全局 Context 下沉到单个 `RoomRow`。hover 只影响当前行，不应触发整棵应用和所有房间行更新。Commit: [17dd2a6](https://github.com/callqh/frontend-interview-takehome-main/commit/17dd2a6)。
+3. 使用 `React.memo` 包装 `RoomRow`。配合稳定 props，减少父组件更新时无关房间行重渲染。Commit: [17dd2a6](https://github.com/callqh/frontend-interview-takehome-main/commit/17dd2a6)。
+4. 在 `BookingGrid` 中按 `roomId` 预分组 bookings。避免每个房间行重复执行 `bookings.filter`。Commit: [17dd2a6](https://github.com/callqh/frontend-interview-takehome-main/commit/17dd2a6)。
+5. 统一使用 `config.dateRangeStart` 生成日期表头和行内日期偏移。避免表头和 booking 定位使用不同日期来源导致不一致。Commit: [17dd2a6](https://github.com/callqh/frontend-interview-takehome-main/commit/17dd2a6)。
+6. 为同房间重叠 booking 分配 lane，并给重叠条增加轻量描边。避免颜色一致时用户误以为是一条被错误延长的预订。Commit: [a987bd1](https://github.com/callqh/frontend-interview-takehome-main/commit/a987bd1)。
+7. 将日期表头和行内容放入同一个横向滚动容器，并 sticky 房间列和表头。保持横向滚动时日期轴和房间行在同一坐标系里。Commit: [0df3643](https://github.com/callqh/frontend-interview-takehome-main/commit/0df3643)。
+8. 对跨出可见日期范围的 booking bar 做 `left/width` 裁剪。保证可见区域内能看到客人名。Commit: [4cfb36f](https://github.com/callqh/frontend-interview-takehome-main/commit/4cfb36f)。
+9. 删除横向滚动 state 和 `useVisibleRange`，横向滚动交给浏览器原生处理。当前只有 30 天，虚拟化收益低，React state 驱动滚动反而会带来大量重算。Commit: [75f86bb](https://github.com/callqh/frontend-interview-takehome-main/commit/75f86bb)。
+10. 抽离一些公共方法和常量到单独文件中方便后续维护。Commit: [ee71b5a](https://github.com/callqh/frontend-interview-takehome-main/commit/ee71b5a)。
+11. 为 Bookings 页面和 BookingDrawer 增加请求失败状态。Commit: [ee71b5a](https://github.com/callqh/frontend-interview-takehome-main/commit/ee71b5a)。
+12. 将 booking 定位、重叠 lane 分配和可视范围裁剪抽到 `bookingLayout.ts`，`RoomRow` 只保留渲染和 hover 状态。这样可以让布局算法独立测试，也避免继续扩大组件职责。Commit: 待提交。
+
+### Messages 页面
+
+1. 让选中工单只以 URL query 为状态源，移除 Context 中的选中态同步。URL 本身可刷新、可分享，保留两套状态会增加风险。Commit: [61eb70e](https://github.com/callqh/frontend-interview-takehome-main/commit/61eb70e)。
+2. MessagesContext 只保留 Sidebar 需要的 `unreadCount`。缩小全局 Context 内容，避免 Messages 页面内部状态影响无关区域。Commit: [61eb70e](https://github.com/callqh/frontend-interview-takehome-main/commit/61eb70e)。
+3. 点击未读工单时使用 SWR `mutate` 将当前缓存中的该工单标记为已读。当前 mock 没有持久化接口，复用 SWR 缓存可以让列表和 Sidebar 从同一数据源派生。Commit: [65ac6e0](https://github.com/callqh/frontend-interview-takehome-main/commit/65ac6e0)。
+4. 将 `/api/tickets` 的 SWR 请求上移到 `MessagesProvider`。Sidebar 未读数属于全局导航信息，不应该依赖 Messages 页面是否挂载。Commit: [ff243cf](https://github.com/callqh/frontend-interview-takehome-main/commit/ff243cf)。
+5. 为 Messages 左侧列表增加 loading、error、empty 状态。避免请求期间白屏，让用户知道当前是加载中、失败还是没有数据。Commit: [e282658](https://github.com/callqh/frontend-interview-takehome-main/commit/e282658)。
+6. 将右侧详情区拆分为选中消息加载中、请求失败、无效 `ticketId` 和未选择消息。深链加载、链接失效和未选择消息是不同状态，不全部使用“Select a message”文案，增加多种语义更明显的文案，提升用户体验。Commit: [6a7c6fb](https://github.com/callqh/frontend-interview-takehome-main/commit/6a7c6fb)。
+
+### API 与工程
+
+1. 将 mock API 的延迟改为 `async/await delay`。让 Next.js 正确等待响应完成避免，API resolved without sending a response for /api/bookings/b38, this may result in stalled requests.的警告。Commit: [907d39d](https://github.com/callqh/frontend-interview-takehome-main/commit/907d39d)。
+2. 增加 ESLint 配置。让 `npm run lint` 非交互化，作为提交前验证命令可稳定运行。Commit: [6bf4ab0](https://github.com/callqh/frontend-interview-takehome-main/commit/6bf4ab0)。
 
 ## 权衡取舍
 
-- 没有引入横向虚拟滚动；当前日期固定为 30 天，直接全量渲染列并用原生横向滚动裁剪，复杂度和错位风险都更低。
-- 如果房间数量继续增长，优先考虑纵向虚拟列表或 room 分页；横向仍不需要优先虚拟化。
-- Messages 已读状态先用 SWR `mutate` 做本地乐观更新，因为当前题目只有 `/api/tickets` mock 列表接口，没有持久化“标记已读”接口；复用 SWR 缓存可以避免新增状态源，并让列表和 Sidebar 使用同一份数据派生结果。
-- 保留 `reactStrictMode` 和 `RoomRow` 的 render 日志；开发环境会出现成对 render log，这是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
-- 工单消息现在使用的是 SWR 的本地乐观更新，在真实业务中应调用 API 持久化已读状态；当前 mock 不持久化，刷新页面后仍会回到初始未读数。
-- 真实系统中的未读数通常需要轮询、SSE/WebSocket 或服务端推送保持实时；本 demo 只做页面内缓存同步，不实现实时通知链路。
+- 没有引入 Redux、Zustand、React Query 等新依赖；继续使用 SWR，因为题目明确要求保留 SWR，当前问题也能通过缩小状态范围和复用 SWR 缓存解决。
+- 没有做横向虚拟滚动；当前固定 30 天，全量渲染列的复杂度更低，也更不容易破坏表头/行对齐。若时间维度显著拉长，再考虑横向虚拟化。
+- 已读状态只做 SWR 本地乐观更新；当前 mock API 没有“标记已读”接口，所以刷新后仍会回到初始未读数。真实系统应调用 API 持久化，并通过轮询、SSE/WebSocket 或服务端推送同步未读数。
+- 保留 `reactStrictMode` 和 `RoomRow` render 日志；开发环境成对 render log 是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
+- `MessagesContext` 中旧的 `HOUSES/House` 映射未直接删除，而是按要求注释保留；当前页面直接从 ticket 读取 `houseName`。
+- 暂未系统性迁移 inline style。当前主要瓶颈是状态范围、重复计算和滚动触发重渲染；样式迁移会触及大量 JSX，收益更多在维护性和长期性能稳定性，适合单独处理。
+- 暂未引入 Prettier。项目原本没有 format 规范，新增格式化依赖会带来大面积格式化 diff；当前只手动保持本次改动文件和既有代码风格一致。
 
 ## 如果有更多时间
 
-- 完善bookings页面用户使用体验：增加房间搜索/用户搜索框、底部增加房间分页、详情框增加Esc按键监听关闭等
-- 响应式布局：当前布局是 Sidebar + booking grid / message list + detail pane。在窄屏或移动端下，固定宽度列会很拥挤
-- 如果数据规模扩大到数百/数千房间，需要引入纵向虚拟滚动，并把 bookings 按日期范围/房间范围分页加载；当前实现仍会一次渲染所有房间行，横向滚动也会触发所有行重算。
-- 增加测试case，保障关键方法和页面的稳定性
+- Bookings：增加房间/客人搜索、快速回到今天、房间分页；数据规模到数百/数千房间时优先做纵向虚拟列表或服务端分页。
+- BookingDrawer：增加 ESC 关闭、关闭按钮 `aria-label`、详情错误重试。
+- Messages：为 ticket row 增加键盘可达性、选中态 ARIA、无效链接恢复操作。
+- 工程：为日期裁剪、lane 分配、SWR mutate 已读状态增加测试；统一日期解析，避免 `YYYY-MM-DD` 在时区解析上的潜在 off-by-one。
+- 样式：将高频渲染区域的 inline style 迁移到 CSS Module 或提取稳定 style 常量，补齐 hover/focus、响应式和可访问性样式。
+- 响应式：当前 Sidebar + booking grid / message list + detail pane 在窄屏会拥挤，需要单独适配。
