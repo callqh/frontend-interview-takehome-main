@@ -2,10 +2,7 @@ import React, { useMemo } from 'react'
 import { Booking, RoomUnit } from '@/types'
 import { RoomRow } from './RoomRow'
 import { useAppContext } from '@/context/AppContext'
-
-const COLUMN_WIDTH_PX = 48
-const ROOM_COLUMN_WIDTH_PX = 140
-const TOTAL_DAYS = 30
+import { COLUMN_WIDTH_PX, ROOM_COLUMN_WIDTH_PX, TOTAL_DAYS } from './constants'
 
 interface BookingGridProps {
   roomUnits: RoomUnit[]

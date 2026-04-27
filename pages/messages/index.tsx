@@ -3,6 +3,7 @@ import type { GetServerSideProps, NextPage } from 'next'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import { Ticket } from '@/types'
+import { jsonFetcher } from '@/lib/fetcher'
 
 interface MessagesPageProps {
   initialTicketId: string | null
@@ -12,16 +13,6 @@ interface MessageViewStateProps {
   title: string
   description?: string
   tone?: 'muted' | 'error'
-}
-
-const fetcher = async (url: string) => {
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error('Failed to load messages')
-  }
-
-  return response.json()
 }
 
 const MessageViewState = ({ title, description, tone = 'muted' }: MessageViewStateProps) => (
@@ -50,7 +41,7 @@ const MessageViewState = ({ title, description, tone = 'muted' }: MessageViewSta
 
 const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const router = useRouter()
-  const { data: tickets, error, isLoading, mutate } = useSWR<Ticket[]>('/api/tickets', fetcher)
+  const { data: tickets, error, isLoading, mutate } = useSWR<Ticket[]>('/api/tickets', jsonFetcher)
 
   // Use ticketId from URL or prop
   const currentTicketId = (router.query.ticketId as string) ?? initialTicketId

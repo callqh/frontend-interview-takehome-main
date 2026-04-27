@@ -1,15 +1,14 @@
 import React, { useState } from 'react'
 import type { NextPage } from 'next'
 import useSWR from 'swr'
-import { Booking, RoomUnit } from '@/types'
+import { Booking } from '@/types'
 import { BookingGrid } from '@/components/BookingGrid/BookingGrid'
 import { BookingDrawer } from '@/components/BookingDrawer/BookingDrawer'
 import { ROOM_UNITS } from '@/lib/mockData'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { jsonFetcher } from '@/lib/fetcher'
 
 const BookingsPage: NextPage = () => {
-  const { data: bookings, isLoading } = useSWR<Booking[]>('/api/bookings', fetcher)
+  const { data: bookings, error, isLoading } = useSWR<Booking[]>('/api/bookings', jsonFetcher)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
   return (
@@ -29,7 +28,11 @@ const BookingsPage: NextPage = () => {
 
       {/* Grid */}
       <div style={{ flex: 1, overflow: 'hidden', padding: 16 }}>
-        {bookings ? (
+        {error ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c62828' }}>
+            Failed to load bookings.
+          </div>
+        ) : bookings ? (
           <BookingGrid
             roomUnits={ROOM_UNITS}
             bookings={bookings}

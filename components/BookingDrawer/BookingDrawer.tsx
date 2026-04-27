@@ -1,13 +1,12 @@
 import React from 'react'
 import useSWR from 'swr'
 import { Booking, BookingDetail } from '@/types'
+import { jsonFetcher } from '@/lib/fetcher'
 
 interface BookingDrawerProps {
   booking: Booking | null
   onClose: () => void
 }
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const STATUS_LABELS: Record<string, string> = {
   confirmed: 'Confirmed',
@@ -18,9 +17,9 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export function BookingDrawer({ booking, onClose }: BookingDrawerProps) {
-  const { data: detail, isLoading } = useSWR<BookingDetail>(
+  const { data: detail, error, isLoading } = useSWR<BookingDetail>(
     booking ? `/api/bookings/${booking.id}` : null,
-    fetcher
+    jsonFetcher
   )
 
   if (!booking) return null
@@ -103,6 +102,10 @@ export function BookingDrawer({ booking, onClose }: BookingDrawerProps) {
               <Row label="Payment" value={detail.paymentStatus} />
               {detail.specialRequests && <Row label="Requests" value={detail.specialRequests} />}
             </>
+          ) : error ? (
+            <p style={{ fontSize: 13, color: '#c62828' }}>
+              Failed to load additional details.
+            </p>
           ) : !isLoading ? (
             <p style={{ fontSize: 13, color: '#aaa' }}>No additional details available.</p>
           ) : null}

@@ -1,8 +1,7 @@
 import React, { memo, useMemo, useState } from "react";
 import { Booking, BookingStatus } from "@/types";
+import { COLUMN_WIDTH_PX, ROOM_COLUMN_WIDTH_PX } from "./constants";
 
-const COLUMN_WIDTH_PX = 48;
-const ROOM_COLUMN_WIDTH_PX = 140;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const BASE_ROW_HEIGHT = 40;
 const BOOKING_BAR_HEIGHT = 24;
