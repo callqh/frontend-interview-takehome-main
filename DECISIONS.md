@@ -12,6 +12,7 @@
 10. Booking 网格横向滚动仍通过 `useVisibleRange` 更新 React state，并把可见范围传给每个 `RoomRow`；滚动时会触发所有行重新渲染和重复 booking 布局计算。
 11. Messages 页面点击未读工单后只更新 URL 选中态，未读点和 Sidebar 未读数不会变化，和“打开即已读”的用户预期不一致。
 12. Messages 页面 tickets 请求期间左侧列表为空白，右侧直接显示“Select a message to view”，用户无法区分“正在加载”和“没有消息”。
+13. Sidebar 的 Messages 未读数依赖 Messages 页面挂载后才写入 Context，首次打开 Bookings 页面时不会展示全局未读角标。
 
 ## 应用的修复
 
@@ -27,6 +28,7 @@
 10. 移除横向滚动 state，同步删除 `useVisibleRange`；`RoomRow` 改为一次性计算当前 30 天内的 positioned bookings，横向滚动交给浏览器原生裁剪。
 11. 点击未读工单时通过 SWR `mutate` 将当前 tickets 缓存中的该工单标记为已读，原有 unread count effect 会随缓存变化同步 Sidebar 数字。
 12. 为 Messages 列表增加 loading、error 和 empty 状态，并让 fetcher 对非 2xx 响应抛错，避免加载阶段白屏。
+13. 将 `/api/tickets` 的 SWR 请求上移到 `MessagesProvider`，Sidebar 未读数从全局 tickets 缓存派生；Messages 页面删除写 Context 的 effect，并用 shallow routing 切换选中工单。
 
 ## 权衡取舍
 
@@ -34,7 +36,7 @@
 - 如果房间数量继续增长，优先考虑纵向虚拟列表或 room 分页；横向仍不需要优先虚拟化。
 - Messages 已读状态先用 SWR `mutate` 做本地乐观更新，因为当前题目只有 `/api/tickets` mock 列表接口，没有持久化“标记已读”接口；复用 SWR 缓存可以避免新增状态源，并让列表和 Sidebar 使用同一份数据派生结果。
 - 保留 `reactStrictMode` 和 `RoomRow` 的 render 日志；开发环境会出现成对 render log，这是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
-- 工单消息现在使用的是swr的乐观更新，在真实业务中是需要请求api接口来更新状态的，所以现在在切换路由时再回来未读消息依然是3条
+- 工单消息现在使用的是 SWR 的本地乐观更新，在真实业务中应调用 API 持久化已读状态；当前 mock 不持久化，刷新页面后仍会回到初始未读数。
 
 ## 如果有更多时间
 

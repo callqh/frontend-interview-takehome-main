@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import type { GetServerSideProps, NextPage } from 'next'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import { Ticket } from '@/types'
-import { useMessagesContext } from '@/context/MessagesContext'
 
 interface MessagesPageProps {
   initialTicketId: string | null
@@ -21,15 +20,7 @@ const fetcher = async (url: string) => {
 
 const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const router = useRouter()
-  const { setUnreadCount } = useMessagesContext()
   const { data: tickets, error, isLoading, mutate } = useSWR<Ticket[]>('/api/tickets', fetcher)
-
-  // Sync unread count into context
-  useEffect(() => {
-    if (tickets) {
-      setUnreadCount(tickets.filter(t => t.unread).length)
-    }
-  }, [tickets, setUnreadCount])
 
   // Use ticketId from URL or prop
   const currentTicketId = (router.query.ticketId as string) ?? initialTicketId
@@ -52,7 +43,7 @@ const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
         ticketId: ticket.id,
         houseId: ticket.houseId,
       },
-    })
+    }, undefined, { shallow: true })
   }
 
   const activeTicket = useMemo(

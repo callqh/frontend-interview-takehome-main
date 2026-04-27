@@ -1,10 +1,10 @@
 import React, {
   createContext,
   useContext,
-  useState,
   useMemo,
   ReactNode,
 } from 'react'
+import useSWR from 'swr'
 import { Ticket } from '@/types'
 
 interface House {
@@ -20,18 +20,30 @@ const HOUSES: House[] = [
 
 interface MessagesContextValue {
   unreadCount: number
-  setUnreadCount: (n: number) => void
 }
 
 const MessagesContext = createContext<MessagesContextValue | null>(null)
 
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error('Failed to load messages')
+  }
+
+  return response.json()
+}
+
 export function MessagesProvider({ children }: { children: ReactNode }) {
-  const [unreadCount, setUnreadCount] = useState(0)
+  const { data: tickets } = useSWR<Ticket[]>('/api/tickets', fetcher)
+  const unreadCount = useMemo(
+    () => tickets?.filter(ticket => ticket.unread).length ?? 0,
+    [tickets]
+  )
 
   const value = useMemo(
     () => ({
       unreadCount,
-      setUnreadCount,
     }),
     [unreadCount]
   )
