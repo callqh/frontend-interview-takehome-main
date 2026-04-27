@@ -8,6 +8,12 @@ interface MessagesPageProps {
   initialTicketId: string | null
 }
 
+interface MessageViewStateProps {
+  title: string
+  description?: string
+  tone?: 'muted' | 'error'
+}
+
 const fetcher = async (url: string) => {
   const response = await fetch(url)
 
@@ -17,6 +23,30 @@ const fetcher = async (url: string) => {
 
   return response.json()
 }
+
+const MessageViewState = ({ title, description, tone = 'muted' }: MessageViewStateProps) => (
+  <div style={{
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: tone === 'error' ? '#c62828' : '#888',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 24,
+  }}>
+    <div>
+      <div style={{ fontWeight: 600, marginBottom: description ? 6 : 0 }}>
+        {title}
+      </div>
+      {description && (
+        <div style={{ color: tone === 'error' ? '#c62828' : '#aaa', fontSize: 12 }}>
+          {description}
+        </div>
+      )}
+    </div>
+  </div>
+)
 
 const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const router = useRouter()
@@ -50,6 +80,7 @@ const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
     () => tickets?.find(t => t.id === currentTicketId),
     [tickets, currentTicketId]
   )
+  const hasSelectedTicket = Boolean(currentTicketId)
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -145,17 +176,26 @@ const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
               {activeTicket.lastMessage}
             </div>
           </div>
+        ) : error ? (
+          <MessageViewState
+            title="Failed to load message"
+            description="Please refresh the page or try again later."
+            tone="error"
+          />
+        ) : isLoading && hasSelectedTicket ? (
+          <MessageViewState
+            title="Loading selected message..."
+            description="We are fetching the message from the current URL."
+          />
+        ) : isLoading ? (
+          <MessageViewState title="Loading messages..." />
+        ) : hasSelectedTicket ? (
+          <MessageViewState
+            title="Message not found"
+            description="The selected ticket may no longer exist or the link is invalid."
+          />
         ) : (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#bbb',
-            fontSize: 14,
-          }}>
-            Select a message to view
-          </div>
+          <MessageViewState title="Select a message to view" />
         )}
       </div>
     </div>
