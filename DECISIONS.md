@@ -8,7 +8,7 @@
 4. 横向滚动时房间列会滚走，或日期轴与行内容出现错位。
 5. hover 状态原本放在全局 Context，鼠标经过单元格会导致无关组件和所有房间行重渲染。
 6. 每行重复 filter bookings，并重复计算日期偏移，数据量变大时会放大渲染成本。
-7. 横向滚动原本通过 React state 驱动 `visibleRange`，滚动时会触发大量行重算。
+7. 横向滚动原本通过 React state 驱动 `visibleRange`，只渲染当前可见的约 15 列日期；但每次滚动都会 `setScrollLeft`，触发 `BookingGrid` 和所有 `RoomRow` 重算。当前只有 30 天，减少 15 列 DOM 的收益小于高频 React render 的成本，也增加表头和行内容错位风险。
 8. booking 定位、重叠判断、lane 分配和裁剪逻辑都放在 `RoomRow.tsx` 中，组件同时承担算法和渲染职责，后续测试和维护不方便。
 9. 没有预订的房间行使用 `bookingsByRoomId.get(room.id) ?? []` 作为 fallback，每次 `BookingGrid` 重渲染都会创建新的空数组引用，导致 `React.memo(RoomRow)` 浅比较失效；打开预订详情时即使点击的不是 room-28/29/30，这些空房间行也会重新 render。
 
@@ -62,7 +62,7 @@
 
 ## 权衡取舍
 
-- 没有做横向虚拟滚动；当前固定 30 天，全量渲染列的复杂度更低，也更不容易破坏表头/行对齐。若时间维度显著拉长，再考虑横向虚拟化。
+- 没有保留旧版基于 `useVisibleRange` 的横向“伪虚拟化”；当前固定 30 天，全量渲染列的复杂度更低，也避免滚动时通过 React state 高频重算。若时间维度显著拉长，再考虑真正的横向虚拟化。
 - 大量重叠预订目前只做 lane 分层，未做折叠/冲突工作流
 - 已读状态只做 SWR 本地乐观更新；当前 mock API 没有“标记已读”接口，所以刷新后仍会回到初始未读数。真实系统应调用 API 持久化，并通过轮询、SSE/WebSocket 或服务端推送同步未读数。
 - 保留 `reactStrictMode` 和 `RoomRow` render 日志；开发环境成对 render log 是 React 18 Strict Mode 的诊断行为，不代表生产环境重复渲染。
