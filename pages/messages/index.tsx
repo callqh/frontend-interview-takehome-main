@@ -14,7 +14,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const router = useRouter()
   const { setUnreadCount } = useMessagesContext()
-  const { data: tickets } = useSWR<Ticket[]>('/api/tickets', fetcher)
+  const { data: tickets, mutate } = useSWR<Ticket[]>('/api/tickets', fetcher)
 
   // Sync unread count into context
   useEffect(() => {
@@ -27,6 +27,17 @@ const MessagesPage: NextPage<MessagesPageProps> = ({ initialTicketId }) => {
   const currentTicketId = (router.query.ticketId as string) ?? initialTicketId
 
   const handleTicketClick = (ticket: Ticket) => {
+    if (ticket.unread) {
+      mutate(
+        currentTickets => currentTickets?.map(currentTicket => (
+          currentTicket.id === ticket.id
+            ? { ...currentTicket, unread: false }
+            : currentTicket
+        )),
+        false
+      )
+    }
+
     router.push({
       pathname: '/messages',
       query: {
